@@ -1,7 +1,12 @@
 --COMMAND TURTLE CODE
 --WIRED VERSION
 local computercraftTurtleName = "computercraft:turtle_normal"
+local computercraftAdvancedTurtleName = "computercraft:turtle_advanced"
+local computercraftDiskDrive = "computercraft:peripheral"
+local computercraftDisk = "computercraft:disk_expanded"
 
+--This will determine the how much fuel is left in a turtle
+--Returns if it is able to start/move
 function determine_fuel_state()
 	local able_to_start = true
 	local fuel_amt = turtle.getFuelLevel()
@@ -12,24 +17,24 @@ function determine_fuel_state()
 	return able_to_start
 end
 
-
+--Method for the command turtle that controls the miner turtles
 function commandTurtle()
-	local normal_chest = "minecraft:chest" 
-	local iron_chest = "ironchest:iron_chest"
-	local gold_chest = "ironchest:gold_chest"
-	local diamond_chest = "ironchest:diamond_chest"
-
+	--Table that contains a list of names for possible storage devices
+	local chest_names = {"minecraft:chest", "ironchest:iron_chest", "ironchest:gold_chest", "ironchest:diamond_chest"}
 	local continue_process = false
 	local fuel_amt = turtle.getFuelLevel()
 	print("Fuel: " .. (fuel_amt/turtle.getFuelLimit())*100 .. "%")
 
 	local chest_with_fuel = false
 	local state, block = turtle.inspectDown()
-	if (block.name == normal_chest or block.name == iron_chest or block.name == gold_chest or block.name == diamond_chest) then
-		chest_with_fuel = true
+	--Loops through chest_names table to find if a chest of suitable need is under
+	for name = 1, #chest_names do
+		if (block.name == chest_names[name]) then
+			chest_with_fuel = true
 	end
+	--While loop that runs to check for a chest to be placed under
 	while chest_with_fuel == false do
-		print("Please place a chest with fuel under me")
+		print("Place a chest with fuel under")
 		print("Checking in 3 seconds")
 		sleep(1)
 		print("Checking in 2 seconds")
@@ -37,14 +42,16 @@ function commandTurtle()
 		print("Checking in 1 second")
 		sleep(1)
 		state, block = turtle.inspectDown()
-		if block.name == diamond_chest then
-			chest_with_fuel = true
+		for name = 1, #chest_names do
+			if (block.name == chest_names[name]) then
+				chest_with_fuel = true
 		end
 	end
 
-	io.write("Number of turtles to deploy: ")
+	--Asks user number of turtles to deploy, and if shulkers are to be used
+	io.write("Deploy amount?: ")
 	local numTurtles = tonumber(io.read())
-	io.write("Using shulkers?: ")
+	io.write("Use Shulkers?: ")
 	local use_shulker = io.read()
 
 	if numTurtles == 0 then
@@ -58,96 +65,81 @@ function commandTurtle()
 	local found_shulker = false
 
 	local turtles_in_inv = 0
-
+	--If shulkers not used, inventory of command turtle will be iterated for items needed
 	if use_shulker == "no" then
-
 		for slot=1, 16 do
 			turtle.select(slot)
 			local item = turtle.getItemDetail()
 			if item ~= nil then
-				if (item.name == computercraftTurtleName or item.name == "computercraft:turtle_advanced") then
+				--If item in slot is a turtle, turtles found becomes true, and amount of turtles found will be added
+				if (item.name == computercraftTurtleName or item.name == computercraftAdvancedTurtleName) then
 					local amt = item.count
 					turtle_found = true
-
 					turtles_in_inv = turtles_in_inv + amt
-
-				elseif item.name == "computercraft:peripheral" then
+				--If the item is a disk_drive, it will change boolean to true and keep note of the slot
+				elseif item.name == computercraftDiskDrive then
 					found_disk_drive = true
 					disk_drive_slot = slot
-
-				elseif item.name == "computercraft:disk_expanded" then
+				--If the item is a disk, it will change boolean to true and keep note of the slot
+				elseif item.name == computercraftDisk then
 					found_disk = true
 					disk_slot = slot
 				end
 			end
 		end
-
+		--Checks if there are the amount of turtles found satisfy the number of turtles wanting to be deployed
 		if turtles_in_inv < numTurtles then
-			print("I only have " .. turtles_in_inv .. " turtles")
+			print("Only " .. turtles_in_inv .. " turtles available...")
 			io.write("Deploy all " .. turtles_in_inv .. " turtles anyways?: ")
 			answer = io.read()
 
 			if answer == "yes" then
 				numTurtles = turtles_in_inv
+				continue_process = true
 
 			elseif answer == "no" then
-				print("Quitting program")
+				print("Shutting down...")
 				return
-
 			else
-				print("Invalid answer, quitting program")
+				print("Invalid answer, shutting down...")
 				return
 			end
 		end
 
+	--Code block for using a shulker holding turtles instead of command turtle inventory
 	elseif use_shulker == "yes" then
-		
 		for slot=1, 16 do
 			turtle.select(slot)
 			local item = turtle.getItemDetail()
 			if item ~= nil then
-				if item.name == "computercraft:peripheral" then
+				if item.name == computercraftDiskDrive then
 					found_disk_drive = true
 					disk_drive_slot = slot
 
-				elseif item.name == "computercraft:disk_expanded" then
+				elseif item.name == computercraftDisk then
 					found_disk = true
 					disk_slot = slot
 
 				elseif string.find(item.name, "shulker_box") ~= nil then
 					found_shulker = true
+					continue_process = true
 
 				end
 			end
 		end
-		turtle_found = true
 	end
 
-	if turtle_found == false then
-		print("I do not have any turtles")
-		print("Please place some in my inventory")
+	if not turtle_found and not found_shulker then
+		print("Missing needed items.")
+		print("Shutting down...")
+		sleep(3)
 		return
-
-	elseif turtle_found and found_disk_drive and found_disk and not found_shulker then
-		payloadSetup(disk_drive_slot, disk_slot)
-
-		continue_process = true
-
-	elseif found_shulker and found_disk_drive and found_disk then
-		payloadSetup(disk_drive_slot, disk_slot)
-
-		continue_process = true
-		turtles_in_shulker = true
-
-	else
-		print("Needed items not found, exiting")
-		return
-
 	end
 
-	return continue_process, numTurtles, turtles_in_shulker
+	payloadSetup(disk_drive_slot, disk_slot)
+	return continue_process, numTurtles, found_shulker
 end
-
+--Sets up placement of payload device to send to mining turtles
 function payloadSetup(disk_drive_slot, disk_slot)
 	turtle.back()
 	turtle.up()
@@ -159,10 +151,10 @@ function payloadSetup(disk_drive_slot, disk_slot)
 
 end
 
-function deployTurtles(numTurtles, turtles_in_shulker)
+function deployTurtles(numTurtles, found_shulker)
 	local deployed_turtles = 0
 
-	if turtles_in_shulker then
+	if found_shulker then
 		local shulker_slots = {}
 		local current_shulker = 1
 		-- finds and adds slot of shulker to list
@@ -181,9 +173,9 @@ function deployTurtles(numTurtles, turtles_in_shulker)
 
 		-- collects turtles until inventory full, but only until turtles to deploy have been satisfied
 		while deployed_turtles < numTurtles do
-			if turtle.suckUp() == true then
+			if turtle.suckUp() then
 				local state, block = turtle.inspect()
-				while state == true do
+				while state do
 					state, block = turtle.inspect()
 				end
 
@@ -195,7 +187,7 @@ function deployTurtles(numTurtles, turtles_in_shulker)
 				term.setCursorPos(1,1)
 				print("Deployed " .. deployed_turtles .. "/" .. numTurtles .. " turtles")
 
-			elseif turtle.suckUp() == false then
+			elseif not turtle.suckUp() then
 				turtle.digUp()
 				turtle.select(shulker_slots[current_shulker])
 				turtle.placeUp()
@@ -203,12 +195,12 @@ function deployTurtles(numTurtles, turtles_in_shulker)
 			end
 		end
 
-	elseif turtles_in_shulker == false then
+	elseif not turtles_in_shulker then
 		for slot=1, 16 do
 			turtle.select(slot)
 			local slot_item = turtle.getItemDetail()
 			if slot_item ~= nil then
-				if (slot_item.name == computercraftTurtleName or slot_item.name == "computercraft:turtle_advanced") then
+				if (slot_item.name == computercraftTurtleName or slot_item.name == computercraftAdvancedTurtleName) then
 					local turtle_in_slot = turtle.getItemDetail()
 
 					if turtle_in_slot.count > 1 then
@@ -252,12 +244,12 @@ function deployTurtles(numTurtles, turtles_in_shulker)
 end
 
 
-function recollect(numTurtles, turtles_in_shulker)
+function recollect(numTurtles, found_shulker)
 	local not_finished = true
 	local turtles_collected = 0
 	local state, block = turtle.inspect()
 
-	if turtles_in_shulker then
+	if found_shulker then
 
 		turtle.select(1)
 
@@ -280,17 +272,15 @@ function recollect(numTurtles, turtles_in_shulker)
 
 		turtle.select(1)
 
-
 		term.clear()
 		term.setCursorPos(1,1)
 
 		print("Waiting for turtles...")
-
 		while turtles_collected < numTurtles do
-			if state == true then
-				if (block.name == computercraftTurtleName or block.name == "computercraft:turtle_advanced") then
+			if state then
+				if (block.name == computercraftTurtleName or block.name == computercraftAdvancedTurtleName) then
 					turtle_dropped_load = false
-					while turtle_dropped_load == false do
+					while not turtle_dropped_load  do
 						local event = os.pullEvent("redstone")
 						turtle_dropped_load = true
 					end
@@ -299,7 +289,8 @@ function recollect(numTurtles, turtles_in_shulker)
 					term.clear()
 					term.setCursorPos(1,1)
 					print("Recollected: " .. turtles_collected .. "/" .. numTurtles)
-					if turtle.dropUp() == false then
+					--Checks is shulker above is full, if it is, breaks and places a new one down for collection
+					if not turtle.dropUp() then
 						currently_equiped_slot = turtle.getSelectedSlot()
 						turtle.digUp()
 						turtle.select(shulker_slot_list[shulker_being_used])
@@ -308,7 +299,6 @@ function recollect(numTurtles, turtles_in_shulker)
 						turtle.dropUp()
 						shulker_being_used = shulker_being_used + 1
 					end
-					
 				end
 			end
 			state, block = turtle.inspect()
@@ -317,7 +307,7 @@ function recollect(numTurtles, turtles_in_shulker)
 		turtle.digUp()
 		turtle.forward()
 
-	elseif turtles_in_shulker == false then
+	elseif not found_shulker then
 		term.clear()
 		term.setCursorPos(1,1)
 
@@ -325,9 +315,9 @@ function recollect(numTurtles, turtles_in_shulker)
 
 		while turtles_collected < numTurtles do
 			if state == true then
-				if (block.name == computercraftTurtleName or block.name == "computercraft:turtle_advanced") then
+				if (block.name == computercraftTurtleName or block.name == computercraftAdvancedTurtleName) then
 					turtle_dropped_load = false
-					while turtle_dropped_load == false do
+					while not turtle_dropped_load do
 						local event = os.pullEvent("redstone")
 						turtle_dropped_load = true
 					end
@@ -365,13 +355,12 @@ function getItemIndex(item_name)
 
 end
 
-
 function main()
 	local start_state = determine_fuel_state()
 	if start_state then
-		continue_process, numTurtles, turtles_in_shulker = commandTurtle()
+		continue_process, numTurtles, found_shulker = commandTurtle()
 		if continue_process then
-			deployTurtles(numTurtles, turtles_in_shulker)
+			deployTurtles(numTurtles, found_shulker)
 
 			local state, block = turtle.inspect()
 
@@ -386,9 +375,9 @@ function main()
 		end
 	end
 
-	recollect(numTurtles, turtles_in_shulker)
+	recollect(numTurtles, found_shulker)
 
-	print("Run has completed.")
+	print("---------------COMPLETED---------------")
 end
 
 
