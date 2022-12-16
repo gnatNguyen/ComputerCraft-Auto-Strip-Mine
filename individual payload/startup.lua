@@ -1,6 +1,20 @@
 --INDIVIDUAL TURTLE MINERS
+local cobblestone = "minecraft:cobblestone"
+local blackListedItems = {
+	"minecraft:stone",
+	"minecraft:cobblestone",
+	"minecraft:netherrack", 
+	"minecraft:diorite", 
+	"minecraft:granite", 
+	"minecraft:gravel", 
+	"minecraft:dirt", 
+	"minecraft:andesite",
+}
+local fluids = {
+	"minecraft:lava",
+	"minecraft:water"
+}
 
-local computercraftTurtleName = "computercraft:turtle_normal"
 
 function refuel()
 	local current_fuel = turtle.getFuelLevel()
@@ -15,18 +29,20 @@ function refuel()
 	end
 end
 
+
 function inspect_block()
 	state, block = turtle.inspect()
 	if state == true then
-		if block.name ~= computercraftTurtleName then
+		if string.find(block.name, "turtle") == nil then
 			turtle.dig()
 		else
-			while block.name == computercraftTurtleName do
+			while string.find(block.name, "turtle") ~= nil do
 				state, block = turtle.inspect()
 			end
 		end
 	end
 end
+
 
 function skip_and_check_next()
 	turtle.turnRight()
@@ -41,11 +57,8 @@ function skip_and_check_next()
 	turtle.turnLeft()
 end
 
+
 function find_wall()
-	local start_mining = false
-	local cobblestone = "minecraft:cobblestone"
-	local turtle_name = "computercraft:turtle_normal"
-	
 	local blocks_from_initial_chest = 0
 	local blocks_from_initial_wall = 0
 
@@ -53,7 +66,7 @@ function find_wall()
 	local state, block = turtle.inspect()
 
 	while block.name ~= cobblestone do
-		while block.name == computercraftTurtleName do
+		while string.find(block.name, "turtle") ~= nil do
 			state, block = turtle.inspect()
 		end
 		turtle.forward()
@@ -62,37 +75,29 @@ function find_wall()
 	end
 
 	-- look for suitable wall to start
-	while start_mining == false do
+	while true do
 		if block.name == cobblestone then
 			skip_and_check_next()
-
-			state, block = turtle.inspect()
-			blocks_from_initial_wall = blocks_from_initial_wall + 1
 
 		elseif state == false then
 			skip_and_check_next()
 
-			state, block = turtle.inspect()
-			blocks_from_initial_wall = blocks_from_initial_wall + 1
-
 		elseif state == true then
-			if block.name == "minecraft:lava" or block.name == "minecraft:water" then
-				skip_and_check_next()
-
-				state, block = turtle.inspect()
-				blocks_from_initial_wall = blocks_from_initial_wall + 1
-
-			elseif block.name == computercraftTurtleName then
-				skip_and_check_next()
-
-				state, block = turtle.inspect()
-				blocks_from_initial_wall = blocks_from_initial_wall + 1
-
-			else
-				start_mining = true
+			for i = 0, #fluids do
+				if block.name == fluids[i] then
+					skip_and_check_next()
+				end
 			end
 
+			if string.find(block.name, "turtle") ~= nil then
+				skip_and_check_next()
+
+			else
+				break
+			end
 		end
+		blocks_from_initial_wall = blocks_from_initial_wall + 1
+		state, block = turtle.inspect()
 		
 	end
 
@@ -102,12 +107,12 @@ end
 
 function EXCAVATION(blocks_from_initial_chest, blocks_from_initial_wall)
 	local current_fuel = turtle.getFuelLevel()
+	--Only allow turtles to mine 100 blocks max as it could enter unloaded chunk past that
 	if current_fuel > 200 then
 		amount_to_mine = 100
 	else
 		amount_to_mine = (current_fuel/2)-(blocks_from_initial_chest+blocks_from_initial_wall)
 	end
-
 
 	turtle.dig()
 	turtle.forward()
@@ -115,38 +120,34 @@ function EXCAVATION(blocks_from_initial_chest, blocks_from_initial_wall)
 	for current_step=1, amount_to_mine do
 		local state, block = turtle.inspect()
 
-		if state == true then
-
+		if state then
 			if (block.name == "minecraft:gravel" or block.name == "minecraft:sand") then
 				turtle.dig()
+				--Waits for gravel/sand to completely fall
+				sleep(.1)
 				state, block = turtle.inspect()
 
 				while (block.name == "minecraft:gravel" or block.name=="minecraft:sand") do
+					sleep(.1)
 					state, block = turtle.inspect()
 					turtle.dig()
 				end
 
-				turtle.digUp()
-				turtle.digDown()
-				turtle.forward()
+				mine_procedure()
 
-
-			elseif (block.name == "minecraft:water" or block.name == "minecraft:lava" or block.name == "pneumaticcraft:oil") then
+			elseif (block.name == "minecraft:water" or block.name == "minecraft:lava") then
 				turtle.forward()
 
 			else
 				turtle.dig()
-				turtle.digUp()
-				turtle.digDown()
-				turtle.forward()
+				mine_procedure()
 			end
 
 		elseif state == false then
-			turtle.digUp()
-			turtle.digDown()
-			turtle.forward()
+			mine_procedure()
 			
 		end
+		--Every 20 steps, turtle will purge its inventory
 		if math.fmod(current_step, 20) == 0 then
 			purgeInventory()
 		end
@@ -154,25 +155,23 @@ function EXCAVATION(blocks_from_initial_chest, blocks_from_initial_wall)
 
 	turtle.digUp()
 	turtle.digDown()
+	--Purges inventory one last time before return
 	purgeInventory()
 
 	return amount_to_mine
 
 end
 
-function purgeInventory()
-	local blackListedItems = {
-		"minecraft:stone",
-		"minecraft:cobblestone",
-		"minecraft:netherrack", 
-		"minecraft:diorite", 
-		"minecraft:granite", 
-		"minecraft:gravel", 
-		"minecraft:dirt", 
-		"minecraft:andesite", 
-		"byg:soapstone", 
-		"byg:rocky_stone"}
 
+function mine_procedure()
+	turtle.digUp()
+	turtle.digDown()
+	turtle.forward()
+end
+
+
+--Itereates through inventory and drops items that are in the blacklisted array
+function purgeInventory()
 	for x=1, 16 do
 		turtle.select(x)
 		local item = turtle.getItemDetail()
@@ -195,18 +194,21 @@ function retraceSteps(blocks_from_initial_chest, blocks_from_initial_wall, block
 	--WALK BACK FROM STRIP MINE
 	for step=0, blocks_to_retrace do
 		local state, block = turtle.inspect()
-		while state == true do
-			if (block.name == "minecraft:lava" or block.name == "minecraft:water" or block.name == "pneumaticcraft:oil") then
+		while state do
+			--If fluid, breaks and moves forward
+			if (block.name == "minecraft:lava" or block.name == "minecraft:water") then
 				break
 
+			--If gravel/sand, will dig it out then moves forward
 			elseif block.name == "minecraft:gravel" or block.name == "minecraft:sand" then
 				while block.name == "minecraft:gravel" or block.name == "minecraft:sand" do
 					turtle.dig()
-					sleep(.5)
+					sleep(.1)
 					state, block = turtle.inspect()
 				end
 
-			elseif block.name == computercraftTurtleName then
+			--If a turtle in front, wait for turtle to move out the way
+			elseif string.find(block.name, "turtle") ~= null then
 				sleep(5)
 
 			else
@@ -222,7 +224,8 @@ function retraceSteps(blocks_from_initial_chest, blocks_from_initial_wall, block
 	--WALK BACK TO WALL POSITION
 	for step_wall=1, blocks_from_initial_wall do
 		local state, block = turtle.inspect()
-		while state == true do
+		while state do
+			--Will only be true state if a turtle in front and moving foward or sitting
 			state, block = turtle.inspect()
 			sleep(1)
 		end
@@ -231,31 +234,28 @@ function retraceSteps(blocks_from_initial_chest, blocks_from_initial_wall, block
 
 	turtle.turnLeft()
 
-
-	--WALK BACK TO BE INFRONT OF CHEST
+	--WALK BACK TO BE ON TOP OF CHEST
 	for step_chest=1, blocks_from_initial_chest do
+		--Checks if on top of chest first, as could be command turtle in front instead of normal miner turtle
 		local chest_check_state, chest_block = turtle.inspectDown()
 		if chest_check_state == true then
 			if string.find(chest_block.name, "chest") ~= nil then
-				print("Retraced steps to original position")
 				break
 			end
 		end
+		--If not on top of chest, checks if turtle in front, this turtle could still be in line
 		local state, block = turtle.inspect()
-		while state == true do
+		while state do
 			state, block = turtle.inspect()
 			sleep(1)
 		end
 
 		turtle.forward()
 	end
-	print("Retraced steps to original position")
-
 end
 
 
 function dropLoad()
-
 	local not_dropped = true
 	local state, block = turtle.inspectDown()
 	if string.find(block.name, "chest") ~= nil then
@@ -266,15 +266,13 @@ function dropLoad()
 				turtle.dropDown()
 			end
 		end
-
 		not_dropped = false
 	else
 		print("Storage not located, retracing may have gone wrong")
 		print("Unit must be manually retrieved")
 	end
-
 	
-	if not_dropped == false then
+	if not not_dropped then
 		print("Sending signal for recollection")
 		while true do
 			redstone.setOutput("front", true)
@@ -287,7 +285,7 @@ end
 
 function main()
 	refuel()
-	local blocks_from_initial_chest, blocks_from_initial_wall =  find_wall()
+	local blocks_from_initial_chest, blocks_from_initial_wall = find_wall()
 	local blocks_to_retrace = EXCAVATION(blocks_from_initial_chest, blocks_from_initial_wall)
 	retraceSteps(blocks_from_initial_chest, blocks_from_initial_wall, blocks_to_retrace)
 	sleep(1)
