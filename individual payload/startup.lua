@@ -10,6 +10,11 @@ local blackListedItems = {
 	"minecraft:dirt", 
 	"minecraft:andesite",
 }
+local gravity_blocks = {
+	"minecraft:gravel",
+	"minecraft:sand",
+	"the_extractinator:silt"
+}
 local fluids = {
 	"minecraft:lava",
 	"minecraft:water"
@@ -32,11 +37,11 @@ end
 
 function inspect_block()
 	state, block = turtle.inspect()
-	if state == true then
+	if state then
 		if string.find(block.name, "turtle") == nil then
 			turtle.dig()
 		else
-			while string.find(block.name, "turtle") ~= nil do
+			while state do
 				state, block = turtle.inspect()
 			end
 		end
@@ -64,12 +69,18 @@ function find_wall()
 
 	--find wall to start mining at
 	local state, block = turtle.inspect()
-
+	sleep(.2)
 	while block.name ~= cobblestone do
-		while string.find(block.name, "turtle") ~= nil do
-			state, block = turtle.inspect()
+		if state then
+			if string.find(block.name, "turtle") ~= nil then
+				while state do
+					state, block = turtle.inspect()
+					sleep(.2)
+				end
+			end
 		end
 		turtle.forward()
+		sleep(.2)
 		state, block = turtle.inspect()
 		blocks_from_initial_chest = blocks_from_initial_chest + 1
 	end
@@ -114,24 +125,12 @@ function EXCAVATION(blocks_from_initial_chest, blocks_from_initial_wall)
 		amount_to_mine = (current_fuel/2)-(blocks_from_initial_chest+blocks_from_initial_wall)
 	end
 
-	turtle.dig()
-	turtle.forward()
-
 	for current_step=1, amount_to_mine do
 		local state, block = turtle.inspect()
 
 		if state then
-			if (block.name == "minecraft:gravel" or block.name == "minecraft:sand") then
-				turtle.dig()
-				--Waits for gravel/sand to completely fall
-				sleep(.1)
-				state, block = turtle.inspect()
-
-				while (block.name == "minecraft:gravel" or block.name=="minecraft:sand") do
-					sleep(.1)
-					state, block = turtle.inspect()
-					turtle.dig()
-				end
+			if (block.name == "minecraft:gravel" or block.name=="minecraft:sand" or block.name == "the_extractinator:silt") then
+				dig_gravity_blocks(block.name)
 
 				mine_procedure()
 
@@ -140,10 +139,14 @@ function EXCAVATION(blocks_from_initial_chest, blocks_from_initial_wall)
 
 			else
 				turtle.dig()
+				local state, block = turtle.inspect()
+				if (block.name == "minecraft:gravel" or block.name=="minecraft:sand" or block.name == "the_extractinator:silt") then
+					dig_gravity_blocks(block.name)
+				end
 				mine_procedure()
 			end
 
-		elseif state == false then
+		elseif not state then
 			mine_procedure()
 			
 		end
@@ -169,6 +172,20 @@ function mine_procedure()
 	turtle.forward()
 end
 
+function dig_gravity_blocks(block)
+	turtle.dig()
+	--Waits for gravel/sand to completely fall
+	sleep(.3)
+	local state, block = turtle.inspect()
+	if state then
+		while (block.name == "minecraft:gravel" or block.name=="minecraft:sand" or block.name == "the_extractinator:silt") do
+			turtle.dig()
+			sleep(.3)
+			state, block = turtle.inspect()
+		end
+	end
+end
+
 
 --Itereates through inventory and drops items that are in the blacklisted array
 function purgeInventory()
@@ -192,7 +209,7 @@ function retraceSteps(blocks_from_initial_chest, blocks_from_initial_wall, block
 	turtle.turnRight()
 
 	--WALK BACK FROM STRIP MINE
-	for step=0, blocks_to_retrace do
+	for step=1, blocks_to_retrace do
 		local state, block = turtle.inspect()
 		while state do
 			--If fluid, breaks and moves forward
@@ -200,15 +217,11 @@ function retraceSteps(blocks_from_initial_chest, blocks_from_initial_wall, block
 				break
 
 			--If gravel/sand, will dig it out then moves forward
-			elseif block.name == "minecraft:gravel" or block.name == "minecraft:sand" then
-				while block.name == "minecraft:gravel" or block.name == "minecraft:sand" do
-					turtle.dig()
-					sleep(.1)
-					state, block = turtle.inspect()
-				end
+			elseif (block.name == "minecraft:gravel" or block.name == "minecraft:sand" or block.name == "the_extractinator:silt") then
+				dig_gravity_blocks(block.name)
 
 			--If a turtle in front, wait for turtle to move out the way
-			elseif string.find(block.name, "turtle") ~= null then
+			elseif string.find(block.name, "turtle") ~= nil then
 				sleep(5)
 
 			else
