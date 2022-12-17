@@ -1,9 +1,6 @@
 --COMMAND TURTLE CODE
 --WIRED VERSION
-local computercraftTurtleName = "computercraft:turtle_normal"
-local computercraftAdvancedTurtleName = "computercraft:turtle_advanced"
-local computercraftDiskDrive = "computercraft:peripheral"
-local computercraftDisk = "computercraft:disk_expanded"
+
 
 --This will determine the how much fuel is left in a turtle
 --Returns if it is able to start/move
@@ -69,19 +66,22 @@ function commandTurtle()
 			local item = turtle.getItemDetail()
 			if item ~= nil then
 				--If item in slot is a turtle, turtles found becomes true, and amount of turtles found will be added
-				if (item.name == computercraftTurtleName or item.name == computercraftAdvancedTurtleName) then
+				if string.find(item.name, "turtle") ~= nil then
 					local amt = item.count
 					turtle_found = true
 					turtles_in_inv = turtles_in_inv + amt
 				--If the item is a disk_drive, it will change boolean to true and keep note of the slot
-				elseif item.name == computercraftDiskDrive then
+				elseif string.find(item.name, "drive") then
 					found_disk_drive = true
 					disk_drive_slot = slot
 				--If the item is a disk, it will change boolean to true and keep note of the slot
-				elseif item.name == computercraftDisk then
+				elseif string.find(item.name, "disk") then
 					found_disk = true
 					disk_slot = slot
 				end
+			end
+			if turtle_found and found_disk_drive and found_disk then
+				continue_process = true
 			end
 		end
 		--Checks if there are the amount of turtles found satisfy the number of turtles wanting to be deployed
@@ -109,11 +109,11 @@ function commandTurtle()
 			turtle.select(slot)
 			local item = turtle.getItemDetail()
 			if item ~= nil then
-				if item.name == computercraftDiskDrive then
+				if string.find(item.name, "drive") then
 					found_disk_drive = true
 					disk_drive_slot = slot
 
-				elseif item.name == computercraftDisk then
+				elseif string.find(item.name, "disk") then
 					found_disk = true
 					disk_slot = slot
 
@@ -195,6 +195,7 @@ function deployTurtles(numTurtles, found_shulker)
 	elseif not turtles_in_shulker then
 		for slot=1, 16 do
 			turtle.select(slot)
+			sleep(.2)
 			local slot_item = turtle.getItemDetail()
 			if slot_item ~= nil then
 				if string.find(slot_item.name, "turtle") ~= nil then
@@ -208,8 +209,9 @@ function deployTurtles(numTurtles, found_shulker)
 								state, block = turtle.inspect()
 							end
 							turtle.place()
-							Turtle = peripheral.wrap("front")
-							Turtle.turnOn()
+							sleep(.4)
+							local miner = peripheral.wrap("front")
+							miner.turnOn()
 
 							--INDIVIDUAL CODE IS LOADED TO TURTLES VIA DISKDRIVE
 							deployed_turtles = deployed_turtles + 1
@@ -224,8 +226,9 @@ function deployTurtles(numTurtles, found_shulker)
 							state, block = turtle.inspect()
 						end
 						turtle.place()
-						Turtle = peripheral.wrap("front")
-						Turtle.turnOn()
+						sleep(.4)
+						local miner = peripheral.wrap("front")
+						miner.turnOn()
 
 						--INDIVIDUAL CODE IS LOADED TO TURTLES VIA DISKDRIVE
 						deployed_turtles = deployed_turtles + 1
@@ -271,7 +274,7 @@ function recollect(numTurtles, found_shulker)
 		print("Waiting for turtles...")
 		while turtles_collected < numTurtles do
 			if state then
-				if (block.name == computercraftTurtleName or block.name == computercraftAdvancedTurtleName) then
+				if string.find(block.name, "turtle") ~= nil then
 					turtle_dropped_load = false
 					while not turtle_dropped_load do
 						os.pullEvent("redstone")
@@ -307,8 +310,8 @@ function recollect(numTurtles, found_shulker)
 		print("Waiting for turtles...")
 
 		while turtles_collected < numTurtles do
-			if state == true then
-				if (block.name == computercraftTurtleName or block.name == computercraftAdvancedTurtleName) then
+			if state then
+				if string.find(block.name, "turtle") ~= nil then
 					turtle_dropped_load = false
 					while not turtle_dropped_load do
 						os.pullEvent("redstone")
